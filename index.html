@@ -1,247 +1,281 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="vi" class="h-full bg-slate-50">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Hukimi Smart Farm - Quản Lý Vườn Dừa Sáp</title>
-  <link rel="stylesheet" href="style.css">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-</head>
-<body>
+  
+  <!-- Tailwind CSS CDN & FontAwesome Icons -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  
+  <!-- IndexedDB Wrapper (Dexie.js) -->
+  <script src="https://unpkg.com/dexie/dist/dexie.js"></script>
 
-  <!-- Thanh Điều Hướng Trên Cùng -->
-  <header class="app-header">
-    <div class="logo">
-      <i class="fa-solid fa-tree"></i>
-      <span>HUKIMI SMART FARM</span>
+  <style>
+    /* Ẩn thanh cuộn mặc định nhưng vẫn cho cuộn cảm ứng */
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+  </style>
+</head>
+<body class="h-full flex flex-col text-slate-800 antialiased select-none">
+
+  <!-- TOP HEADER -->
+  <header class="bg-emerald-700 text-white px-4 py-3 flex items-center justify-between shadow-md shrink-0 sticky top-0 z-40">
+    <div class="flex items-center space-x-2">
+      <div class="w-8 h-8 rounded-full bg-emerald-800 flex items-center justify-center border border-emerald-500">
+        <i class="fa-solid fa-seedling text-emerald-300 text-sm"></i>
+      </div>
+      <div>
+        <h1 class="text-base font-bold leading-none tracking-tight">HUKIMI SMART FARM</h1>
+        <p class="text-[10px] text-emerald-200 mt-0.5">Vườn Dừa Sáp Cấy Mô • Trực quan hóa GIS & AI</p>
+      </div>
     </div>
-    <div class="header-actions">
-      <button id="btn-open-settings" class="icon-btn" title="Cài đặt API AI"><i class="fa-solid fa-gear"></i></button>
-      <button id="btn-add-tree" class="primary-btn"><i class="fa-solid fa-plus"></i> Thêm Cây</button>
+    <div class="flex items-center space-x-2">
+      <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-900/60 text-emerald-200 border border-emerald-600/50">
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5 animate-pulse"></span> Offline Ready
+      </span>
     </div>
   </header>
 
-  <!-- Thanh Tổng Quan KPI -->
-  <section class="kpi-bar">
-    <div class="kpi-card">
-      <span class="kpi-label">Tổng số cây</span>
-      <span class="kpi-value" id="kpi-total-trees">0</span>
-    </div>
-    <div class="kpi-card">
-      <span class="kpi-label">Chiều cao TB</span>
-      <span class="kpi-value" id="kpi-avg-height">-- m</span>
-    </div>
-    <div class="kpi-card">
-      <span class="kpi-label">Cần theo dõi</span>
-      <span class="kpi-value warning" id="kpi-need-check">0</span>
-    </div>
-  </section>
+  <!-- MAIN SCROLLABLE CONTENT (CONTAINER 6 MÀN HÌNH) -->
+  <main class="flex-1 overflow-y-auto pb-24 p-4 no-scrollbar">
 
-  <!-- Bộ Lọc & Tìm Kiếm -->
-  <section class="filter-section">
-    <div class="search-box">
-      <i class="fa-solid fa-magnifying-glass"></i>
-      <input type="text" id="input-search" placeholder="Tìm theo mã cây (ví dụ: HKM-H1-01)...">
-    </div>
-    <select id="select-plot-filter">
-      <option value="ALL">Tất cả các Khu / Lô</option>
-    </select>
-  </section>
+    <!-- TAB 1: DASHBOARD (TỔNG QUAN) -->
+    <section id="tab-dashboard" class="tab-content active space-y-4">
+      <div class="flex justify-between items-center">
+        <h2 class="text-lg font-bold text-slate-900">Tổng quan tình trạng vườn</h2>
+        <span id="quick-date" class="text-xs text-slate-500 font-medium"></span>
+      </div>
 
-  <!-- Danh Sách Sơ Đồ Cây (Dạng Lưới) -->
-  <main class="grid-container" id="trees-grid">
-    <!-- Thẻ cây sẽ được render động từ CSDL -->
+      <!-- KPI CARDS -->
+      <div class="grid grid-cols-2 gap-3">
+        <div class="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-sm">
+          <div class="flex items-center justify-between text-slate-500 text-xs">
+            <span>Tổng quy mô</span>
+            <i class="fa-solid fa-tree text-emerald-600"></i>
+          </div>
+          <p id="kpi-total-trees" class="text-2xl font-extrabold text-slate-900 mt-1">--</p>
+          <span class="text-[11px] text-emerald-600 font-medium">4 hàng × 18 cây</span>
+        </div>
+
+        <div class="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-sm">
+          <div class="flex items-center justify-between text-slate-500 text-xs">
+            <span>Chiều cao TB</span>
+            <i class="fa-solid fa-ruler-vertical text-sky-600"></i>
+          </div>
+          <p id="kpi-avg-height" class="text-2xl font-extrabold text-slate-900 mt-1">-- <span class="text-sm font-normal text-slate-500">m</span></p>
+          <span class="text-[11px] text-sky-600 font-medium">Đo bằng AR Cam</span>
+        </div>
+
+        <div class="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-sm">
+          <div class="flex items-center justify-between text-slate-500 text-xs">
+            <span>Bẹ lá xanh TB</span>
+            <i class="fa-solid fa-leaf text-green-600"></i>
+          </div>
+          <p id="kpi-avg-leaves" class="text-2xl font-extrabold text-slate-900 mt-1">--</p>
+          <span class="text-[11px] text-green-600 font-medium">Gemini AI đếm</span>
+        </div>
+
+        <div class="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-sm">
+          <div class="flex items-center justify-between text-slate-500 text-xs">
+            <span>Cảnh báo sâu bệnh</span>
+            <i class="fa-solid fa-triangle-exclamation text-amber-500"></i>
+          </div>
+          <p id="kpi-warning-trees" class="text-2xl font-extrabold text-amber-600 mt-1">--</p>
+          <span class="text-[11px] text-amber-600 font-medium">Cần xử lý nấm</span>
+        </div>
+      </div>
+
+      <!-- QUICK ACTIONS -->
+      <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3.5">
+        <h3 class="text-xs font-bold text-emerald-900 uppercase tracking-wider mb-2">Thao tác nhanh thực địa</h3>
+        <div class="grid grid-cols-2 gap-2">
+          <button onclick="switchTab('tab-field-input')" class="flex items-center justify-center space-x-2 bg-emerald-600 active:bg-emerald-700 text-white font-medium py-2.5 px-3 rounded-lg text-xs shadow-sm">
+            <i class="fa-solid fa-camera"></i>
+            <span>Đo AR & Soi AI</span>
+          </button>
+          <button onclick="switchTab('tab-field-input')" class="flex items-center justify-center space-x-2 bg-white active:bg-slate-100 text-emerald-800 border border-emerald-300 font-medium py-2.5 px-3 rounded-lg text-xs shadow-sm">
+            <i class="fa-solid fa-qrcode"></i>
+            <span>Quét nhanh mã QR</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- DANH SÁCH CẦN LƯU Ý -->
+      <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+        <div class="flex justify-between items-center mb-3">
+          <h3 class="text-sm font-bold text-slate-900">Cây cần theo dõi đặc biệt</h3>
+          <span class="text-[11px] text-slate-500">Tự động phát hiện</span>
+        </div>
+        <div id="attention-list" class="space-y-2">
+          <!-- Render tự động từ db.js -->
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: BẢN ĐỒ SỐ & DANH MỤC CÂY -->
+    <section id="tab-directory" class="tab-content space-y-4">
+      <div class="flex justify-between items-center">
+        <div>
+          <h2 class="text-lg font-bold text-slate-900">Bản đồ GIS & Danh mục</h2>
+          <p class="text-xs text-slate-500">Tra cứu 72 cây dừa sáp và vị trí vệ tinh</p>
+        </div>
+      </div>
+      <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-center min-h-[300px] text-slate-400 text-xs">
+        [Tab 2: Bản đồ vệ tinh tương tác & Thẻ Passport cây sẽ triển khai ở bước kế tiếp]
+      </div>
+    </section>
+
+    <!-- TAB 3: DÒNG THỜI GIAN SINH TRƯỞNG -->
+    <section id="tab-growth" class="tab-content space-y-4">
+      <h2 class="text-lg font-bold text-slate-900">Lịch sử & Sinh trưởng (Δ)</h2>
+      <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-center min-h-[300px] text-slate-400 text-xs">
+        [Tab 3: Biểu đồ tăng trưởng & So sánh ảnh AR theo thời gian]
+      </div>
+    </section>
+
+    <!-- TAB 4: NHẬP LIỆU THỰC ĐỊA, CAMERA AR & GEMINI AI -->
+    <section id="tab-field-input" class="tab-content space-y-4">
+      <h2 class="text-lg font-bold text-slate-900">Thực địa: Thước đo AR & Gemini AI</h2>
+      <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-center min-h-[300px] text-slate-400 text-xs">
+        [Tab 4: Camera AR Ruler kéo thả đo chiều cao + Gemini Vision AI đếm bẹ lá]
+      </div>
+    </section>
+
+    <!-- TAB 5: NHẬT KÝ CHĂM SÓC & DỊCH HẠI -->
+    <section id="tab-care" class="tab-content space-y-4">
+      <h2 class="text-lg font-bold text-slate-900">Nhật ký Phân bón & Dịch hại</h2>
+      <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-center min-h-[300px] text-slate-400 text-xs">
+        [Tab 5: Lịch trình vi sinh, nấm Metarhizium & nhắc việc tự động]
+      </div>
+    </section>
+
+    <!-- TAB 6: BÁO CÁO & CẤU HÌNH -->
+    <section id="tab-settings" class="tab-content space-y-4">
+      <h2 class="text-lg font-bold text-slate-900">Cấu hình & Mở rộng Lô</h2>
+      <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-center min-h-[300px] text-slate-400 text-xs">
+        [Tab 6: Cài đặt Gemini API Key, Xuất Excel 16 cột UTF-8, Sinh lô mới]
+      </div>
+    </section>
+
   </main>
 
-  <!-- MODAL: CAMERA AR ĐO CHIỀU CAO & VISION AI -->
-  <div id="modal-camera" class="modal-fullscreen hidden">
-    <div class="camera-viewport">
-      <video id="camera-feed" autoplay playsinline></video>
-      <canvas id="camera-overlay"></canvas>
+  <!-- BOTTOM NAVIGATION BAR (6 TABS - MOBILE FIRST) -->
+  <nav class="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur border-t border-slate-200 px-1 py-1.5 flex justify-around items-center z-40 shadow-lg">
+    
+    <button onclick="switchTab('tab-dashboard')" id="nav-tab-dashboard" class="nav-btn flex flex-col items-center flex-1 py-1 text-emerald-600 transition-colors">
+      <i class="fa-solid fa-chart-pie text-base"></i>
+      <span class="text-[9px] font-semibold mt-1">Tổng quan</span>
+    </button>
 
-      <!-- Vạch thước đo ảo AR Overlay -->
-      <div class="ruler-container" id="ruler-container">
-        <div class="ruler-mark-top" id="marker-top">
-          <span class="ruler-bubble"><i class="fa-solid fa-arrows-up-down"></i> Ngọn dừa: <span id="label-top-h">2.0</span>m</span>
-        </div>
-        <div class="ruler-stem-line"></div>
-        <div class="ruler-mark-base" id="marker-base">
-          <span class="ruler-bubble">Gốc cây (0.0m)</span>
-        </div>
+    <button onclick="switchTab('tab-directory')" id="nav-tab-directory" class="nav-btn flex flex-col items-center flex-1 py-1 text-slate-400 hover:text-slate-600 transition-colors">
+      <i class="fa-solid fa-map-location-dot text-base"></i>
+      <span class="text-[9px] font-semibold mt-1">Bản đồ/Cây</span>
+    </button>
+
+    <button onclick="switchTab('tab-field-input')" id="nav-tab-field-input" class="nav-btn flex flex-col items-center flex-1 py-1 text-slate-400 hover:text-slate-600 transition-colors">
+      <div class="w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center -mt-3 shadow-md border-2 border-white">
+        <i class="fa-solid fa-camera text-xs"></i>
       </div>
+      <span class="text-[9px] font-semibold mt-0.5">Đo AR/AI</span>
+    </button>
 
-      <!-- Header trong Camera -->
-      <div class="camera-top-bar">
-        <span class="camera-target-code" id="cam-target-code">HKM-H1-01</span>
-        <button id="btn-close-cam" class="close-cam-btn"><i class="fa-solid fa-xmark"></i></button>
-      </div>
+    <button onclick="switchTab('tab-growth')" id="nav-tab-growth" class="nav-btn flex flex-col items-center flex-1 py-1 text-slate-400 hover:text-slate-600 transition-colors">
+      <i class="fa-solid fa-chart-line text-base"></i>
+      <span class="text-[9px] font-semibold mt-1">Sinh trưởng</span>
+    </button>
 
-      <!-- Điều khiển Camera -->
-      <div class="camera-bottom-bar">
-        <div class="cam-guide">
-          <span><i class="fa-solid fa-arrows-up-down-left-right"></i> Kéo vạch vàng vào ngọn cây, căn gốc về 0m (Đứng cách cây 3.5m)</span>
-        </div>
-        <div class="cam-action-buttons">
-          <button id="btn-switch-cam" class="cam-ctrl-btn" title="Đổi camera"><i class="fa-solid fa-rotate"></i></button>
-          <button id="btn-snap-ai" class="snap-btn" title="Chụp & Phân Tích AI">
-            <div class="snap-inner"></div>
-          </button>
-          <div class="status-indicator" id="cam-ai-status">
-            <i class="fa-solid fa-robot"></i>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
+    <button onclick="switchTab('tab-care')" id="nav-tab-care" class="nav-btn flex flex-col items-center flex-1 py-1 text-slate-400 hover:text-slate-600 transition-colors">
+      <i class="fa-solid fa-hand-holding-droplet text-base"></i>
+      <span class="text-[9px] font-semibold mt-1">Chăm sóc</span>
+    </button>
 
-  <!-- MODAL: BIỂU MẪU NHẬT KÝ SINH TRƯỞNG & CHĂM SÓC -->
-  <div id="modal-log-form" class="modal-backdrop hidden">
-    <div class="modal-box">
-      <div class="modal-header">
-        <h3 id="form-tree-title">Nhật Ký Cây: HKM-H1-01</h3>
-        <button class="close-btn" id="btn-close-form">&times;</button>
-      </div>
-      <div class="modal-body">
-        <div class="preview-img-container" id="img-preview-box">
-          <img id="form-preview-img" src="" alt="Ảnh thực địa" class="hidden">
-          <div id="ai-analyzing-spinner" class="analyzing-state hidden">
-            <i class="fa-solid fa-spinner fa-spin"></i>
-            <span>AI đang đếm bẹ lá & kiểm tra vết bọ dừa...</span>
-          </div>
-        </div>
+    <button onclick="switchTab('tab-settings')" id="nav-tab-settings" class="nav-btn flex flex-col items-center flex-1 py-1 text-slate-400 hover:text-slate-600 transition-colors">
+      <i class="fa-solid fa-sliders text-base"></i>
+      <span class="text-[9px] font-semibold mt-1">Cài đặt</span>
+    </button>
 
-        <form id="growth-log-form">
-          <div class="form-row">
-            <div class="form-group">
-              <label>Chiều cao đo được (m):</label>
-              <input type="number" step="0.05" id="input-height" required>
-            </div>
-            <div class="form-group">
-              <label>Số bẹ lá xanh (AI gợi ý):</label>
-              <input type="number" id="input-leaves" required>
-            </div>
-          </div>
+  </nav>
 
-          <div class="form-group">
-            <label>Đánh giá sức khỏe:</label>
-            <select id="select-health">
-              <option value="Rất tốt">Rất tốt</option>
-              <option value="Tốt">Tốt</option>
-              <option value="Đang phục hồi">Đang phục hồi</option>
-              <option value="Cần theo dõi">Cần theo dõi</option>
-              <option value="Kém ổn định">Kém ổn định</option>
-            </select>
-          </div>
+  <!-- SCRIPT LOGIC CƠ BẢN -->
+  <script src="js/db.js"></script>
+  <script>
+    // Hàm chuyển tab
+    function switchTab(tabId) {
+      // Ẩn tất cả tab content
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      // Bật tab được chọn
+      const target = document.getElementById(tabId);
+      if (target) target.classList.add('active');
 
-          <div class="form-group">
-            <label>Tình trạng sâu bệnh / Bọ dừa:</label>
-            <input type="text" id="input-pest" placeholder="VD: Bình thường (không bọ dừa) / Vết cắn bọ dừa nhẹ">
-          </div>
+      // Cập nhật màu sắc icon nav
+      document.querySelectorAll('.nav-btn').forEach(btn => {
+        btn.classList.remove('text-emerald-600');
+        btn.classList.add('text-slate-400');
+      });
+      const activeNav = document.getElementById('nav-' + tabId);
+      if (activeNav) {
+        activeNav.classList.remove('text-slate-400');
+        activeNav.classList.add('text-emerald-600');
+      }
 
-          <div class="form-group">
-            <label>Biện pháp chăm sóc / Bón phân:</label>
-            <input type="text" id="input-care" placeholder="VD: Hữu cơ vi sinh 1.5kg / Chế phẩm Metarhizium">
-          </div>
+      // Nếu chuyển về tab dashboard thì làm mới số liệu
+      if (tabId === 'tab-dashboard') loadDashboardData();
+    }
 
-          <div class="form-group">
-            <label>Ghi chú thực địa:</label>
-            <textarea id="input-notes" rows="2" placeholder="Ghi nhận thêm về gốc, tán lá..."></textarea>
-          </div>
+    // Load số liệu KPI động từ IndexedDB lên Dashboard
+    async function loadDashboardData() {
+      try {
+        const trees = await db.trees.toArray();
+        if (!trees.length) return;
 
-          <div class="modal-footer">
-            <button type="button" id="btn-retake-photo" class="secondary-btn"><i class="fa-solid fa-camera"></i> Chụp lại</button>
-            <button type="submit" class="primary-btn"><i class="fa-solid fa-floppy-disk"></i> Lưu Bản Ghi</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  </div>
+        document.getElementById('kpi-total-trees').innerText = trees.length;
+        
+        const totalHeight = trees.reduce((sum, t) => sum + (t.estimatedHeight || 0), 0);
+        document.getElementById('kpi-avg-height').innerHTML = `${(totalHeight / trees.length).toFixed(2)} <span class="text-sm font-normal text-slate-500">m</span>`;
 
-  <!-- MODAL: THÊM CÂY MỚI / THÊM HÀNG LOẠT -->
-  <div id="modal-add-tree" class="modal-backdrop hidden">
-    <div class="modal-box">
-      <div class="modal-header">
-        <h3>Mở Rộng Quy Mô Vườn</h3>
-        <button class="close-btn" id="btn-close-add-tree">&times;</button>
-      </div>
-      <div class="modal-body">
-        <div class="tabs">
-          <button class="tab-btn active" id="tab-single">Thêm 1 Cây</button>
-          <button class="tab-btn" id="tab-batch">Tạo Cả Lô Hàng Loạt</button>
-        </div>
+        const totalLeaves = trees.reduce((sum, t) => sum + (t.greenLeafCount || 0), 0);
+        document.getElementById('kpi-avg-leaves').innerText = (totalLeaves / trees.length).toFixed(1);
 
-        <!-- Form 1 cây -->
-        <form id="form-single-tree">
-          <div class="form-group">
-            <label>Khu vực / Lô:</label>
-            <input type="text" id="single-plot" value="Khu A" required>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>Hàng số:</label>
-              <input type="number" id="single-row" min="1" value="1" required>
-            </div>
-            <div class="form-group">
-              <label>Cây số:</label>
-              <input type="number" id="single-num" min="1" value="1" required>
-            </div>
-          </div>
-          <div class="form-group">
-            <label>Mã cây định danh:</label>
-            <input type="text" id="single-code" value="HKM-H1-01" required>
-          </div>
-          <div class="form-group">
-            <label>Giống dừa:</label>
-            <input type="text" id="single-variety" value="Cấy mô Viện Cây có dầu (IOOP)">
-          </div>
-          <button type="submit" class="primary-btn full-w"><i class="fa-solid fa-plus"></i> Tạo Cây</button>
-        </form>
+        const warningTrees = trees.filter(t => t.healthStatus === 'Cần theo dõi' || t.healthStatus === 'Kém ổn định' || t.healthStatus === 'Đang phục hồi');
+        document.getElementById('kpi-warning-trees').innerText = warningTrees.length;
 
-        <!-- Form Hàng loạt -->
-        <form id="form-batch-trees" class="hidden">
-          <div class="form-group">
-            <label>Tên Lô / Khu mới:</label>
-            <input type="text" id="batch-plot" placeholder="Ví dụ: Khu B - Mở Rộng" required>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>Số hàng:</label>
-              <input type="number" id="batch-rows" min="1" value="4" required>
-            </div>
-            <div class="form-group">
-              <label>Số cây mỗi hàng:</label>
-              <input type="number" id="batch-cols" min="1" value="18" required>
-            </div>
-          </div>
-          <div class="form-group">
-            <label>Tiền tố mã định danh:</label>
-            <input type="text" id="batch-prefix" value="HKM-B" required>
-          </div>
-          <button type="submit" class="primary-btn full-w"><i class="fa-solid fa-layer-group"></i> Sinh Tự Động Toàn Bộ Lô</button>
-        </form>
-      </div>
-    </div>
-  </div>
+        // Render danh sách cảnh báo
+        const listContainer = document.getElementById('attention-list');
+        listContainer.innerHTML = '';
+        if (warningTrees.length === 0) {
+          listContainer.innerHTML = `<div class="text-xs text-emerald-600">Tất cả 72 cây đều đang phát triển rất tốt.</div>`;
+        } else {
+          warningTrees.forEach(t => {
+            listContainer.innerHTML += `
+              <div class="flex items-center justify-between p-2.5 rounded-lg bg-amber-50/70 border border-amber-200/70">
+                <div class="flex items-center space-x-2.5">
+                  <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+                  <div>
+                    <p class="text-xs font-bold text-slate-900">${t.code} (${t.order})</p>
+                    <p class="text-[11px] text-amber-700 font-medium">${t.pestStatus}</p>
+                  </div>
+                </div>
+                <span class="text-[10px] px-2 py-0.5 rounded font-semibold bg-white text-amber-800 border border-amber-300">
+                  ${t.healthStatus}
+                </span>
+              </div>
+            `;
+          });
+        }
+      } catch (e) {
+        console.error("Lỗi cập nhật dashboard:", e);
+      }
+    }
 
-  <!-- MODAL: CÀI ĐẶT API KEY GEMINI -->
-  <div id="modal-settings" class="modal-backdrop hidden">
-    <div class="modal-box">
-      <div class="modal-header">
-        <h3>Cấu Hình Trí Tuệ Nhân Tạo (AI)</h3>
-        <button class="close-btn" id="btn-close-settings">&times;</button>
-      </div>
-      <div class="modal-body">
-        <p class="settings-desc">Nhập khóa Google Gemini API Key để kích hoạt chức năng đếm bẹ lá và phát hiện bọ dừa tự động bằng AI.</p>
-        <div class="form-group">
-          <label>Gemini API Key:</label>
-          <input type="password" id="input-api-key" placeholder="AIzaSy...">
-        </div>
-        <button id="btn-save-key" class="primary-btn full-w">Lưu Khóa API</button>
-      </div>
-    </div>
-  </div>
-
-  <script src="db.js"></script>
-  <script src="app.js"></script>
+    // Khởi động
+    document.addEventListener("DOMContentLoaded", () => {
+      document.getElementById('quick-date').innerText = new Date().toLocaleDateString('vi-VN', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
+      setTimeout(loadDashboardData, 400); // Chờ IndexedDB khởi tạo
+    });
+  </script>
 </body>
 </html>
