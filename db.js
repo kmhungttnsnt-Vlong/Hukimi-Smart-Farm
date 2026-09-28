@@ -1,139 +1,81 @@
 /**
- * DB.JS: Quản lý cơ sở dữ liệu IndexedDB của ứng dụng Hukimi Farm
+ * HUKIMI SMART FARM - DATABASE LAYER (IndexedDB via Dexie)
+ * Quản lý dữ liệu offline: Cây (Master Trees), Sinh trưởng (Growth Logs), Nhật ký chăm sóc (Care Logs)
  */
-const DB_NAME = 'HukimiCoconutFarmDB';
-const DB_VERSION = 1;
 
-let dbInstance = null;
+// 1. Khởi tạo Database
+const db = new Dexie("HukimiSmartFarmDB");
 
-function openDB() {
-  return new Promise((resolve, reject) => {
-    if (dbInstance) return resolve(dbInstance);
+// 2. Khai báo Schema (Lưu trữ và đánh chỉ mục)
+db.version(1).stores({
+  trees: "id, code, row, treeNumber, healthStatus, plantingDate", // Bảng 16 thuộc tính master
+  growth_logs: "++id, treeCode, recordDate, healthRating",       // Lịch sử đo đạc, ảnh AR
+  care_logs: "++id, treeCode, careDate, actionType",            // Lịch sử bón phân, phòng trừ sâu bệnh
+  settings: "key"                                               // Cấu hình app (Gemini API Key,...)
+});
 
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
+// 3. Hàm tạo dữ liệu mặc định 72 cây dừa sáp cấy mô (HKM-H1-01 -> HKM-H4-18)
+async function seedDefaultTrees() {
+  const count = await db.trees.count();
+  if (count > 0) return; // Nếu đã có dữ liệu thì không ghi đè
 
-    request.onupgradeneeded = (event) => {
-      const db = event.target.result;
+  console.log("Đang khởi tạo dữ liệu mặc định cho 72 cây dừa sáp Hukimi...");
+  const defaultTrees = [];
+  
+  // Tọa độ thực địa tham chiếu khu vực vườn (Trà Vinh / Vĩnh Long)
+  const baseLat = 9.922325;
+  const baseLng = 106.012548;
+  const spacingLat = 0.000065; // ~7m khoảng cách hàng
+  const spacingLng = 0.000065; // ~7m khoảng cách cây
 
-      // Kho 1: Danh bạ cây dừa
-      if (!db.objectStoreNames.contains('trees')) {
-        const treeStore = db.createObjectStore('trees', { keyPath: 'code' });
-        treeStore.createIndex('plot', 'plot', { unique: false });
-        treeStore.createIndex('health', 'health', { unique: false });
+  for (let r = 1; r <= 4; r++) {
+    for (let c = 1; c <= 18; c++) {
+      const code = `HKM-H${r}-${c.toString().padStart(2, "0")}`;
+      const lat = (baseLat + (r - 1) * spacingLat).toFixed(6);
+      const lng = (baseLng + (c - 1) * spacingLng).toFixed(6);
+      
+      // Giả lập trạng thái tự nhiên ban đầu cho 72 cây sau gần 2 năm
+      let health = "Rất tốt";
+      let pest = "Bình thường (không bọ dừa)";
+      let height = (1.75 + Math.random() * 0.35).toFixed(2);
+      let leafCount = Math.floor(11 + Math.random() * 5);
+
+      if (r === 2 && c === 7) {
+        health = "Cần theo dõi";
+        pest = "Vết cắn bọ dừa nhẹ";
+      } else if (r === 3 && c === 12) {
+        health = "Đang phục hồi";
+        pest = "Vết cắn bọ dừa cũ, đã xử lý";
       }
 
-      // Kho 2: Nhật ký sinh trưởng & ảnh thực địa
-      if (!db.objectStoreNames.contains('logs')) {
-        const logStore = db.createObjectStore('logs', { keyPath: 'id', autoIncrement: true });
-        logStore.createIndex('treeCode', 'treeCode', { unique: false });
-        logStore.createIndex('timestamp', 'timestamp', { unique: false });
-      }
-    };
+      defaultTrees.push({
+        id: code,
+        // --- 16 THUỘC TÍNH DỮ LIỆU GỐC (MASTER SHEET) ---
+        code: code,                                                          // 1. Mã định danh
+        order: `Hàng ${r} - Cây ${c.toString().padStart(2, "0")}`,           // 2. Thứ tự Hàng - Cây
+        row: r,
+        treeNumber: c,
+        latitude: parseFloat(lat),                                          // 3. Tọa độ Vĩ độ (Lat)
+        longitude: parseFloat(lng),                                         // 4. Tọa độ Kinh độ (Lng)
+        googleMapsUrl: `https://www.google.com/maps?q=${lat},${lng}`,       // 5. Link Google Maps
+        qrPayload: `HUKIMI_TREE:${code}`,                                   // 6. Mã QR định danh
+        variety: "Dừa sáp cấy mô (Viện Cây có dầu IOOP)",                   // 7. Nguồn gốc giống
+        plantingDate: "2024-07-13",                                          // 8. Ngày trồng
+        growthStage: "2 năm tuổi (chờ trổ bông)",                            // 9. Giai đoạn sinh trưởng
+        estimatedHeight: parseFloat(height),                                // 10. Chiều cao ước tính (m)
+        greenLeafCount: leafCount,                                          // 11. Số bẹ lá xanh
+        pestStatus: pest,                                                   // 12. Tình trạng sâu bệnh
+        lastCareAction: "Hữu cơ vi sinh 1.5kg + Nấm Metarhizium",           // 13. Phân bón/Chăm sóc gần nhất
+        lastCareDate: "2026-03-15",                                         // 14. Ngày chăm sóc
+        healthStatus: health,                                               // 15. Đánh giá sức khỏe
+        fieldNotes: "Cây phát triển rễ tốt, bẹ lá thẳng, gốc nở đều."       // 16. Ghi chú thực địa
+      });
+    }
+  }
 
-    request.onsuccess = (event) => {
-      dbInstance = event.target.result;
-      resolve(dbInstance);
-    };
-
-    request.onerror = (e) => reject('Lỗi mở IndexedDB: ' + e);
-  });
+  await db.trees.bulkAdd(defaultTrees);
+  console.log("Khởi tạo thành công 72 cây vào IndexedDB!");
 }
 
-// Khởi tạo 72 cây mặc định ban đầu nếu cơ sở dữ liệu trống
-async function initSeedDataIfEmpty() {
-  const db = await openDB();
-  const tx = db.transaction('trees', 'readwrite');
-  const store = tx.objectStore('trees');
-  const countReq = store.count();
-
-  return new Promise((resolve) => {
-    countReq.onsuccess = () => {
-      if (countReq.result === 0) {
-        // Nạp 4 hàng x 18 cây = 72 cây của vườn Hukimi
-        for (let r = 1; r <= 4; r++) {
-          for (let c = 1; c <= 18; c++) {
-            const padC = c < 10 ? '0' + c : c;
-            const code = `HKM-H${r}-${padC}`;
-            
-            // Dữ liệu mẫu khớp với Sheet hiện tại
-            let height = 2.0;
-            let leaves = 14;
-            let health = 'Rất tốt';
-            let stage = '2 năm tuổi (chờ trổ bông)';
-
-            if (r === 1 && c === 5) {
-              height = 1.8;
-              leaves = 12;
-              health = 'Cần theo dõi';
-            } else if (r === 1 && c === 8) {
-              health = 'Kém ổn định';
-            }
-
-            store.add({
-              code: code,
-              plot: 'Khu A (Gốc)',
-              row: r,
-              col: c,
-              height: height,
-              leaves: leaves,
-              health: health,
-              stage: stage,
-              variety: 'Cấy mô Viện Cây có dầu (IOOP)',
-              plantDate: '2024-07-13',
-              lastCare: '2026-09-01',
-              pestStatus: (r === 1 && c === 5) ? 'Vết cắn bọ dừa nhẹ' : 'Bình thường'
-            });
-          }
-        }
-      }
-      resolve();
-    };
-  });
-}
-
-// Lấy tất cả cây
-async function getAllTrees() {
-  const db = await openDB();
-  return new Promise((resolve) => {
-    const tx = db.transaction('trees', 'readonly');
-    const store = tx.objectStore('trees');
-    const req = store.getAll();
-    req.onsuccess = () => resolve(req.result || []);
-  });
-}
-
-// Lưu hoặc cập nhật 1 cây
-async function saveTree(treeObj) {
-  const db = await openDB();
-  return new Promise((resolve) => {
-    const tx = db.transaction('trees', 'readwrite');
-    tx.objectStore('trees').put(treeObj);
-    tx.oncomplete = () => resolve(true);
-  });
-}
-
-// Lưu bản ghi nhật ký sinh trưởng
-async function addGrowthLog(logObj) {
-  const db = await openDB();
-  return new Promise((resolve) => {
-    const tx = db.transaction(['logs', 'trees'], 'readwrite');
-    tx.objectStore('logs').add(logObj);
-
-    // Cập nhật chỉ số mới nhất ngược lại vào hồ sơ cây
-    const treeStore = tx.objectStore('trees');
-    const getReq = treeStore.get(logObj.treeCode);
-    getReq.onsuccess = () => {
-      const tree = getReq.result;
-      if (tree) {
-        tree.height = logObj.height;
-        tree.leaves = logObj.leaves;
-        tree.health = logObj.health;
-        tree.pestStatus = logObj.pestStatus;
-        tree.lastCare = logObj.date;
-        treeStore.put(tree);
-      }
-    };
-
-    tx.oncomplete = () => resolve(true);
-  });
-}
+// Chạy khởi tạo khi mở ứng dụng
+seedDefaultTrees().catch(err => console.error("Lỗi khởi tạo DB:", err));
