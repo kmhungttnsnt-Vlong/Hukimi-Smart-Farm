@@ -4,178 +4,106 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Hukimi Smart Farm - Quản Lý Vườn Dừa Sáp</title>
-  
-  <!-- Tailwind CSS CDN & FontAwesome Icons -->
+
+  <!-- PWA & META TAGS -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#047857">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Hukimi Farm">
+  <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/192/628/628283.png">
+
+  <!-- TAILWIND CSS & FONT AWESOME ICONS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  
-  <!-- IndexedDB Wrapper (Dexie.js) -->
+
+  <!-- DEXIE.JS (INDEXEDDB) -->
   <script src="https://unpkg.com/dexie/dist/dexie.js"></script>
 
+  <!-- LEAFLET.JS (BẢN ĐỒ SỐ GIS) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- QR CODE GENERATOR & SCANNER -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://unpkg.com/html5-qrcode"></script>
+
+  <!-- SHEETJS (XUẤT EXCEL UTF-8) -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+
   <style>
-    /* Ẩn thanh cuộn mặc định nhưng vẫn cho cuộn cảm ứng */
+    /* Tối ưu trải nghiệm chạm trên điện thoại */
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     .tab-content { display: none; }
     .tab-content.active { display: block; }
+    /* Hiệu ứng mượt mà khi mở modal */
+    @keyframes slideUp {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
+    }
+    .animate-slide-up {
+      animation: slideUp 0.25s ease-out forwards;
+    }
   </style>
 </head>
 <body class="h-full flex flex-col text-slate-800 antialiased select-none">
 
-  <!-- TOP HEADER -->
+  <!-- THANH TIÊU ĐỀ TRÊN CÙNG (TOP HEADER) -->
   <header class="bg-emerald-700 text-white px-4 py-3 flex items-center justify-between shadow-md shrink-0 sticky top-0 z-40">
-    <div class="flex items-center space-x-2">
-      <div class="w-8 h-8 rounded-full bg-emerald-800 flex items-center justify-center border border-emerald-500">
+    <div class="flex items-center space-x-2.5">
+      <div class="w-8 h-8 rounded-full bg-emerald-800 flex items-center justify-center border border-emerald-500 shadow-inner">
         <i class="fa-solid fa-seedling text-emerald-300 text-sm"></i>
       </div>
       <div>
         <h1 class="text-base font-bold leading-none tracking-tight">HUKIMI SMART FARM</h1>
-        <p class="text-[10px] text-emerald-200 mt-0.5">Vườn Dừa Sáp Cấy Mô • Trực quan hóa GIS & AI</p>
+        <p class="text-[10px] text-emerald-200 mt-0.5 font-medium">Vườn Dừa Sáp Cấy Mô • Trực quan GIS & AI</p>
       </div>
     </div>
     <div class="flex items-center space-x-2">
       <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-900/60 text-emerald-200 border border-emerald-600/50">
-        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5 animate-pulse"></span> Offline Ready
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5 animate-pulse"></span> PWA Ready
       </span>
     </div>
   </header>
 
-  <!-- MAIN SCROLLABLE CONTENT (CONTAINER 6 MÀN HÌNH) -->
+  <!-- VÙNG NỘI DUNG CUỘN ĐƯỢC CHỨA 6 TAB MÀN HÌNH -->
   <main class="flex-1 overflow-y-auto pb-24 p-4 no-scrollbar">
+    <!-- TAB 1: DASHBOARD -->
+    <section id="tab-dashboard" class="tab-content active space-y-4"></section>
 
-    <!-- TAB 1: DASHBOARD (TỔNG QUAN) -->
-    <section id="tab-dashboard" class="tab-content active space-y-4">
-      <div class="flex justify-between items-center">
-        <h2 class="text-lg font-bold text-slate-900">Tổng quan tình trạng vườn</h2>
-        <span id="quick-date" class="text-xs text-slate-500 font-medium"></span>
-      </div>
-
-      <!-- KPI CARDS -->
-      <div class="grid grid-cols-2 gap-3">
-        <div class="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-sm">
-          <div class="flex items-center justify-between text-slate-500 text-xs">
-            <span>Tổng quy mô</span>
-            <i class="fa-solid fa-tree text-emerald-600"></i>
-          </div>
-          <p id="kpi-total-trees" class="text-2xl font-extrabold text-slate-900 mt-1">--</p>
-          <span class="text-[11px] text-emerald-600 font-medium">4 hàng × 18 cây</span>
-        </div>
-
-        <div class="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-sm">
-          <div class="flex items-center justify-between text-slate-500 text-xs">
-            <span>Chiều cao TB</span>
-            <i class="fa-solid fa-ruler-vertical text-sky-600"></i>
-          </div>
-          <p id="kpi-avg-height" class="text-2xl font-extrabold text-slate-900 mt-1">-- <span class="text-sm font-normal text-slate-500">m</span></p>
-          <span class="text-[11px] text-sky-600 font-medium">Đo bằng AR Cam</span>
-        </div>
-
-        <div class="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-sm">
-          <div class="flex items-center justify-between text-slate-500 text-xs">
-            <span>Bẹ lá xanh TB</span>
-            <i class="fa-solid fa-leaf text-green-600"></i>
-          </div>
-          <p id="kpi-avg-leaves" class="text-2xl font-extrabold text-slate-900 mt-1">--</p>
-          <span class="text-[11px] text-green-600 font-medium">Gemini AI đếm</span>
-        </div>
-
-        <div class="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-sm">
-          <div class="flex items-center justify-between text-slate-500 text-xs">
-            <span>Cảnh báo sâu bệnh</span>
-            <i class="fa-solid fa-triangle-exclamation text-amber-500"></i>
-          </div>
-          <p id="kpi-warning-trees" class="text-2xl font-extrabold text-amber-600 mt-1">--</p>
-          <span class="text-[11px] text-amber-600 font-medium">Cần xử lý nấm</span>
-        </div>
-      </div>
-
-      <!-- QUICK ACTIONS -->
-      <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3.5">
-        <h3 class="text-xs font-bold text-emerald-900 uppercase tracking-wider mb-2">Thao tác nhanh thực địa</h3>
-        <div class="grid grid-cols-2 gap-2">
-          <button onclick="switchTab('tab-field-input')" class="flex items-center justify-center space-x-2 bg-emerald-600 active:bg-emerald-700 text-white font-medium py-2.5 px-3 rounded-lg text-xs shadow-sm">
-            <i class="fa-solid fa-camera"></i>
-            <span>Đo AR & Soi AI</span>
-          </button>
-          <button onclick="switchTab('tab-field-input')" class="flex items-center justify-center space-x-2 bg-white active:bg-slate-100 text-emerald-800 border border-emerald-300 font-medium py-2.5 px-3 rounded-lg text-xs shadow-sm">
-            <i class="fa-solid fa-qrcode"></i>
-            <span>Quét nhanh mã QR</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- DANH SÁCH CẦN LƯU Ý -->
-      <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-        <div class="flex justify-between items-center mb-3">
-          <h3 class="text-sm font-bold text-slate-900">Cây cần theo dõi đặc biệt</h3>
-          <span class="text-[11px] text-slate-500">Tự động phát hiện</span>
-        </div>
-        <div id="attention-list" class="space-y-2">
-          <!-- Render tự động từ db.js -->
-        </div>
-      </div>
-    </section>
-
-    <!-- TAB 2: BẢN ĐỒ SỐ & DANH MỤC CÂY -->
-    <section id="tab-directory" class="tab-content space-y-4">
-      <div class="flex justify-between items-center">
-        <div>
-          <h2 class="text-lg font-bold text-slate-900">Bản đồ GIS & Danh mục</h2>
-          <p class="text-xs text-slate-500">Tra cứu 72 cây dừa sáp và vị trí vệ tinh</p>
-        </div>
-      </div>
-      <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-center min-h-[300px] text-slate-400 text-xs">
-        [Tab 2: Bản đồ vệ tinh tương tác & Thẻ Passport cây sẽ triển khai ở bước kế tiếp]
-      </div>
-    </section>
+    <!-- TAB 2: BẢN ĐỒ GIS & DIRECTORY -->
+    <section id="tab-directory" class="tab-content space-y-4"></section>
 
     <!-- TAB 3: DÒNG THỜI GIAN SINH TRƯỞNG -->
-    <section id="tab-growth" class="tab-content space-y-4">
-      <h2 class="text-lg font-bold text-slate-900">Lịch sử & Sinh trưởng (Δ)</h2>
-      <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-center min-h-[300px] text-slate-400 text-xs">
-        [Tab 3: Biểu đồ tăng trưởng & So sánh ảnh AR theo thời gian]
-      </div>
-    </section>
+    <section id="tab-growth" class="tab-content space-y-4"></section>
 
-    <!-- TAB 4: NHẬP LIỆU THỰC ĐỊA, CAMERA AR & GEMINI AI -->
-    <section id="tab-field-input" class="tab-content space-y-4">
-      <h2 class="text-lg font-bold text-slate-900">Thực địa: Thước đo AR & Gemini AI</h2>
-      <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-center min-h-[300px] text-slate-400 text-xs">
-        [Tab 4: Camera AR Ruler kéo thả đo chiều cao + Gemini Vision AI đếm bẹ lá]
-      </div>
-    </section>
+    <!-- TAB 4: THỰC ĐỊA AR & GEMINI AI -->
+    <section id="tab-field-input" class="tab-content space-y-4"></section>
 
     <!-- TAB 5: NHẬT KÝ CHĂM SÓC & DỊCH HẠI -->
-    <section id="tab-care" class="tab-content space-y-4">
-      <h2 class="text-lg font-bold text-slate-900">Nhật ký Phân bón & Dịch hại</h2>
-      <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-center min-h-[300px] text-slate-400 text-xs">
-        [Tab 5: Lịch trình vi sinh, nấm Metarhizium & nhắc việc tự động]
-      </div>
-    </section>
+    <section id="tab-care" class="tab-content space-y-4"></section>
 
-    <!-- TAB 6: BÁO CÁO & CẤU HÌNH -->
-    <section id="tab-settings" class="tab-content space-y-4">
-      <h2 class="text-lg font-bold text-slate-900">Cấu hình & Mở rộng Lô</h2>
-      <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-center min-h-[300px] text-slate-400 text-xs">
-        [Tab 6: Cài đặt Gemini API Key, Xuất Excel 16 cột UTF-8, Sinh lô mới]
-      </div>
-    </section>
-
+    <!-- TAB 6: BÁO CÁO & CẤU HÌNH HỆ THỐNG -->
+    <section id="tab-settings" class="tab-content space-y-4"></section>
   </main>
 
-  <!-- BOTTOM NAVIGATION BAR (6 TABS - MOBILE FIRST) -->
+  <!-- THANH ĐIỀU HƯỚNG DƯỚI ĐÁY (BOTTOM NAVIGATION - 6 TABS) -->
   <nav class="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur border-t border-slate-200 px-1 py-1.5 flex justify-around items-center z-40 shadow-lg">
     
+    <!-- Tab 1 -->
     <button onclick="switchTab('tab-dashboard')" id="nav-tab-dashboard" class="nav-btn flex flex-col items-center flex-1 py-1 text-emerald-600 transition-colors">
       <i class="fa-solid fa-chart-pie text-base"></i>
       <span class="text-[9px] font-semibold mt-1">Tổng quan</span>
     </button>
 
+    <!-- Tab 2 -->
     <button onclick="switchTab('tab-directory')" id="nav-tab-directory" class="nav-btn flex flex-col items-center flex-1 py-1 text-slate-400 hover:text-slate-600 transition-colors">
       <i class="fa-solid fa-map-location-dot text-base"></i>
       <span class="text-[9px] font-semibold mt-1">Bản đồ/Cây</span>
     </button>
 
+    <!-- Tab 4: Nút trọng tâm Camera AR & AI -->
     <button onclick="switchTab('tab-field-input')" id="nav-tab-field-input" class="nav-btn flex flex-col items-center flex-1 py-1 text-slate-400 hover:text-slate-600 transition-colors">
       <div class="w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center -mt-3 shadow-md border-2 border-white">
         <i class="fa-solid fa-camera text-xs"></i>
@@ -183,16 +111,19 @@
       <span class="text-[9px] font-semibold mt-0.5">Đo AR/AI</span>
     </button>
 
+    <!-- Tab 3 -->
     <button onclick="switchTab('tab-growth')" id="nav-tab-growth" class="nav-btn flex flex-col items-center flex-1 py-1 text-slate-400 hover:text-slate-600 transition-colors">
       <i class="fa-solid fa-chart-line text-base"></i>
       <span class="text-[9px] font-semibold mt-1">Sinh trưởng</span>
     </button>
 
+    <!-- Tab 5 -->
     <button onclick="switchTab('tab-care')" id="nav-tab-care" class="nav-btn flex flex-col items-center flex-1 py-1 text-slate-400 hover:text-slate-600 transition-colors">
       <i class="fa-solid fa-hand-holding-droplet text-base"></i>
       <span class="text-[9px] font-semibold mt-1">Chăm sóc</span>
     </button>
 
+    <!-- Tab 6 -->
     <button onclick="switchTab('tab-settings')" id="nav-tab-settings" class="nav-btn flex flex-col items-center flex-1 py-1 text-slate-400 hover:text-slate-600 transition-colors">
       <i class="fa-solid fa-sliders text-base"></i>
       <span class="text-[9px] font-semibold mt-1">Cài đặt</span>
@@ -200,18 +131,27 @@
 
   </nav>
 
-  <!-- SCRIPT LOGIC CƠ BẢN -->
+  <!-- NẠP CÁC FILE SCRIPT DỰ ÁN THEO THỨ TỰ -->
   <script src="js/db.js"></script>
+  <script src="js/screens/tab1-dashboard.js"></script>
+  <script src="js/screens/tab2-directory.js"></script>
+  <script src="js/screens/tab3-growth.js"></script>
+  <script src="js/screens/tab4-field-input.js"></script>
+  <script src="js/screens/tab5-care-log.js"></script>
+  <script src="js/screens/tab6-settings.js"></script>
+
+  <!-- KHỞI CHẠY VÀ ĐIỀU HƯỚNG SPA -->
   <script>
-    // Hàm chuyển tab
+    // Hàm chuyển Tab
     function switchTab(tabId) {
-      // Ẩn tất cả tab content
+      // Ẩn nội dung các tab khác
       document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      
       // Bật tab được chọn
       const target = document.getElementById(tabId);
       if (target) target.classList.add('active');
 
-      // Cập nhật màu sắc icon nav
+      // Đổi màu sắc nút điều hướng
       document.querySelectorAll('.nav-btn').forEach(btn => {
         btn.classList.remove('text-emerald-600');
         btn.classList.add('text-slate-400');
@@ -222,59 +162,65 @@
         activeNav.classList.add('text-emerald-600');
       }
 
-      // Nếu chuyển về tab dashboard thì làm mới số liệu
-      if (tabId === 'tab-dashboard') loadDashboardData();
-    }
-
-    // Load số liệu KPI động từ IndexedDB lên Dashboard
-    async function loadDashboardData() {
-      try {
-        const trees = await db.trees.toArray();
-        if (!trees.length) return;
-
-        document.getElementById('kpi-total-trees').innerText = trees.length;
-        
-        const totalHeight = trees.reduce((sum, t) => sum + (t.estimatedHeight || 0), 0);
-        document.getElementById('kpi-avg-height').innerHTML = `${(totalHeight / trees.length).toFixed(2)} <span class="text-sm font-normal text-slate-500">m</span>`;
-
-        const totalLeaves = trees.reduce((sum, t) => sum + (t.greenLeafCount || 0), 0);
-        document.getElementById('kpi-avg-leaves').innerText = (totalLeaves / trees.length).toFixed(1);
-
-        const warningTrees = trees.filter(t => t.healthStatus === 'Cần theo dõi' || t.healthStatus === 'Kém ổn định' || t.healthStatus === 'Đang phục hồi');
-        document.getElementById('kpi-warning-trees').innerText = warningTrees.length;
-
-        // Render danh sách cảnh báo
-        const listContainer = document.getElementById('attention-list');
-        listContainer.innerHTML = '';
-        if (warningTrees.length === 0) {
-          listContainer.innerHTML = `<div class="text-xs text-emerald-600">Tất cả 72 cây đều đang phát triển rất tốt.</div>`;
-        } else {
-          warningTrees.forEach(t => {
-            listContainer.innerHTML += `
-              <div class="flex items-center justify-between p-2.5 rounded-lg bg-amber-50/70 border border-amber-200/70">
-                <div class="flex items-center space-x-2.5">
-                  <span class="w-2 h-2 rounded-full bg-amber-500"></span>
-                  <div>
-                    <p class="text-xs font-bold text-slate-900">${t.code} (${t.order})</p>
-                    <p class="text-[11px] text-amber-700 font-medium">${t.pestStatus}</p>
-                  </div>
-                </div>
-                <span class="text-[10px] px-2 py-0.5 rounded font-semibold bg-white text-amber-800 border border-amber-300">
-                  ${t.healthStatus}
-                </span>
-              </div>
-            `;
-          });
-        }
-      } catch (e) {
-        console.error("Lỗi cập nhật dashboard:", e);
+      // Kích hoạt nạp lại dữ liệu phù hợp với từng tab
+      if (tabId === 'tab-dashboard') {
+        loadDashboardData();
+      } else if (tabId === 'tab-directory') {
+        setTimeout(async () => {
+          if (typeof initLeafletMap === 'function') await initLeafletMap();
+          const trees = await db.trees.toArray();
+          if (typeof renderTreeGrid === 'function') renderTreeGrid(trees);
+        }, 150);
+      } else if (tabId === 'tab-growth') {
+        setTimeout(() => {
+          if (typeof populateGrowthTreeSelector === 'function') populateGrowthTreeSelector();
+        }, 100);
+      } else if (tabId === 'tab-care') {
+        setTimeout(() => {
+          if (typeof loadCareLogs === 'function') loadCareLogs();
+        }, 100);
+      } else if (tabId === 'tab-settings') {
+        setTimeout(() => {
+          if (typeof loadStoredApiKey === 'function') loadStoredApiKey();
+        }, 100);
       }
     }
 
-    // Khởi động
+    // Khởi chạy khi tài liệu tải xong
     document.addEventListener("DOMContentLoaded", () => {
-      document.getElementById('quick-date').innerText = new Date().toLocaleDateString('vi-VN', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
-      setTimeout(loadDashboardData, 400); // Chờ IndexedDB khởi tạo
+      // 1. Render cấu trúc DOM của cả 6 màn hình
+      if (typeof renderTab1Content === 'function') renderTab1Content();
+      if (typeof renderTab2Content === 'function') renderTab2Content();
+      if (typeof renderTab3Content === 'function') renderTab3Content();
+      if (typeof renderTab4Content === 'function') renderTab4Content();
+      if (typeof renderTab5Content === 'function') renderTab5Content();
+      if (typeof renderTab6Content === 'function') renderTab6Content();
+
+      // 2. Cập nhật ngày tháng trên Dashboard
+      const quickDateEl = document.getElementById('quick-date');
+      if (quickDateEl) {
+        quickDateEl.innerText = new Date().toLocaleDateString('vi-VN', { 
+          weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' 
+        });
+      }
+
+      // 3. Tải số liệu tổng quan sau khi IndexedDB sẵn sàng
+      setTimeout(() => {
+        if (typeof loadDashboardData === 'function') loadDashboardData();
+      }, 350);
+
+      // 4. Thiết lập ngày mặc định cho form sinh lô mới ở Tab 6
+      const dateInput = document.getElementById('batch-planting-date');
+      if (dateInput) {
+        dateInput.value = new Date().toISOString().split('T')[0];
+      }
+
+      // 5. Đăng ký Service Worker cho PWA Offline
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('./sw.js')
+          .then(reg => console.log('Hukimi PWA Service Worker Registered:', reg.scope))
+          .catch(err => console.error('Lỗi Service Worker:', err));
+      }
     });
   </script>
 </body>
